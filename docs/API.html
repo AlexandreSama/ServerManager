@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Documentation API - ServerManager</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f9f9f9; color: #333; padding: 2em; }
+        h1 { color: #444; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+        th, td { border: 1px solid #ccc; padding: 0.6em; text-align: left; }
+        th { background: #eee; }
+        code { background: #eee; padding: 2px 4px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+<h1>📡 Documentation API - ServerManager</h1>
+<p>Voici la documentation des endpoints HTTP exposés par le plugin <strong>ServerManager</strong>.</p>
+
+<h2>🔐 Authentification</h2>
+<p>Toutes les requêtes doivent inclure un header HTTP :</p>
+<pre><code>Authorization: Bearer VOTRE_TOKEN</code></pre>
+<p>Les endpoints sensibles exigent également un champ <code>username</code> dans le corps de la requête.</p>
+
+<h2>📘 Endpoints disponibles</h2>
+<table>
+    <thead>
+    <tr>
+        <th>Méthode</th>
+        <th>Endpoint</th>
+        <th>Paramètres</th>
+        <th>Description</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr><td>GET</td><td>/api/serverinfo</td><td>-</td><td>Nombre de joueurs en ligne / max</td></tr>
+    <tr><td>GET</td><td>/api/status</td><td>-</td><td>Infos mémoire + nombre de joueurs</td></tr>
+    <tr><td>POST</td><td>/api/stop</td><td><code>username</code></td><td>Arrête le serveur</td></tr>
+    <tr><td>POST</td><td>/api/restart</td><td><code>username</code></td><td>Redémarre le serveur (via script externe)</td></tr>
+    <tr><td>GET</td><td>/api/players</td><td>-</td><td>Liste des joueurs connectés (nom, UUID, ping)</td></tr>
+    <tr><td>POST</td><td>/api/message</td><td><code>text</code>, <code>username</code></td><td>Message global à tous les joueurs</td></tr>
+    <tr><td>POST</td><td>/api/kick</td><td><code>player</code>, <code>reason?</code>, <code>silent?</code>, <code>username</code></td><td>Expulse un joueur</td></tr>
+    <tr><td>POST</td><td>/api/command</td><td><code>cmd</code>, <code>username</code></td><td>Exécute une commande console</td></tr>
+    <tr><td>GET</td><td>/api/chatlog</td><td>-</td><td>Derniers messages du chat</td></tr>
+    </tbody>
+</table>
+
+<h2>🧪 Exemple de requête POST</h2>
+<pre><code>POST /api/kick
+Content-Type: application/x-www-form-urlencoded
+Authorization: Bearer VOTRE_TOKEN
+
+player=Steve&reason=AFK&silent=true&username=adminMobile</code></pre>
+
+</body>
+</html>

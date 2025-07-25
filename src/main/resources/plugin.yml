@@ -1,0 +1,7 @@
+name: Keystone
+version: 1.0
+main: fr.djinn.servermanager.ServerManager
+api-version: 1.21
+description: Plugin de gestion de serveur Minecraft via API sécurisée.
+author: Djinn
+website: https://github.com/tonrepo/keystone

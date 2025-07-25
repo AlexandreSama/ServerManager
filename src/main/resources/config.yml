@@ -1,0 +1,8 @@
+api:
+  enabled: true
+  ssl: true
+  port: 9020
+  token: "CHANGEMOI"
+  keystore:
+    path: "plugins/ServerManager/keystore.jks"
+    password: "changeit"

@@ -6,7 +6,9 @@ import fi.iki.elonen.NanoHTTPD;
 import fr.djinn.servermanager.security.HmacVerifier;
 import fr.djinn.servermanager.util.JsonValidator;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -14,9 +16,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.lang.reflect.Type;
 import java.security.KeyStore;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ServerApiHttp extends NanoHTTPD {
 
@@ -96,6 +96,43 @@ public class ServerApiHttp extends NanoHTTPD {
             if (json.length() > 1) json.setLength(json.length() - 1);
             json.append("]");
             return newFixedLengthResponse(Response.Status.OK, "application/json", json.toString());
+        }
+
+        if (uri.equalsIgnoreCase("/api/playerinfo") && method == Method.POST) {
+            return handleJson(session, body, (username, data) -> {
+                JsonValidator v = new JsonValidator(data);
+                v.require("player");
+                if (v.hasErrors()) return v.getErrorSummary();
+
+                String target = data.get("player");
+                Player player = Bukkit.getPlayerExact(target);
+                if (player == null) return "Joueur introuvable ou hors ligne.";
+
+                Map<String, Object> info = new LinkedHashMap<>();
+                info.put("uuid", player.getUniqueId().toString());
+                info.put("name", player.getName());
+                info.put("health", player.getHealth());
+                info.put("food", player.getFoodLevel());
+                info.put("ping", player.getPing());
+                info.put("gamemode", player.getGameMode().name());
+                info.put("isOp", player.isOp());
+
+                Location loc = player.getLocation();
+                Map<String, Object> locMap = new HashMap<>();
+                locMap.put("world", loc.getWorld().getName());
+                locMap.put("x", loc.getX());
+                locMap.put("y", loc.getY());
+                locMap.put("z", loc.getZ());
+                info.put("location", locMap);
+
+                List<String> inventory = new ArrayList<>();
+                for (ItemStack item : player.getInventory().getContents()) {
+                    if (item != null) inventory.add(item.getType().name());
+                }
+                info.put("inventory", inventory);
+
+                return gson.toJson(info);
+            });
         }
 
         if (uri.equalsIgnoreCase("/api/stop") && method == Method.POST) {

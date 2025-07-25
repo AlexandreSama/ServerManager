@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import fi.iki.elonen.NanoHTTPD;
 import fr.djinn.servermanager.security.HmacVerifier;
+import fr.djinn.servermanager.util.JsonValidator;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -115,8 +116,11 @@ public class ServerApiHttp extends NanoHTTPD {
 
         if (uri.equalsIgnoreCase("/api/message") && method == Method.POST) {
             return handleJson(session, body, (username, data) -> {
+                JsonValidator v = new JsonValidator(data);
+                v.require("text");
+                if (v.hasErrors()) return v.getErrorSummary();
+
                 String text = data.get("text");
-                if (text == null || text.isEmpty()) return "Paramètre 'text' requis.";
                 Bukkit.broadcastMessage("§a[" + username + "] §f" + text);
                 plugin.getLogger().info("📢 Message envoyé par " + username + " : " + text);
                 return "Message envoyé.";
@@ -125,11 +129,14 @@ public class ServerApiHttp extends NanoHTTPD {
 
         if (uri.equalsIgnoreCase("/api/kick") && method == Method.POST) {
             return handleJson(session, body, (username, data) -> {
+                JsonValidator v = new JsonValidator(data);
+                v.require("player").optional("silent").asBoolean().optional("reason");
+                if (v.hasErrors()) return v.getErrorSummary();
+
                 String target = data.get("player");
                 String reason = data.getOrDefault("reason", "Expulsé via l'API");
                 String silent = data.getOrDefault("silent", "false");
 
-                if (target == null) return "Paramètre 'player' requis.";
                 Player player = Bukkit.getPlayerExact(target);
                 if (player == null) return "Joueur introuvable ou hors ligne.";
 
@@ -149,8 +156,11 @@ public class ServerApiHttp extends NanoHTTPD {
 
         if (uri.equalsIgnoreCase("/api/command") && method == Method.POST) {
             return handleJson(session, body, (username, data) -> {
+                JsonValidator v = new JsonValidator(data);
+                v.require("cmd");
+                if (v.hasErrors()) return v.getErrorSummary();
+
                 String cmd = data.get("cmd");
-                if (cmd == null || cmd.isEmpty()) return "Paramètre 'cmd' requis.";
                 plugin.getLogger().info("⚙️ [" + username + "] a exécuté : /" + cmd);
                 plugin.getServer().getScheduler().runTask(plugin, () ->
                         plugin.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd));
@@ -202,3 +212,4 @@ public class ServerApiHttp extends NanoHTTPD {
         String handle(String username, Map<String, String> data) throws Exception;
     }
 }
+

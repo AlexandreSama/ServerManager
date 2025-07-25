@@ -2,55 +2,81 @@
   <img src="plugin-icon.png" width="96" height="96" alt="Keystone logo"/>
 </p>
 
-# 🔐 Keystone - ServerManager API Plugin
+# Keystone Plugin
 
-Keystone est un plugin Minecraft pour Spigot 1.21+ qui permet de contrôler votre serveur via une API HTTPS sécurisée (token + SSL + audit log).
+Keystone est un plugin Spigot sécurisé permettant de contrôler un serveur Minecraft via une API HTTP/HTTPS.
 
-## ✨ Fonctionnalités
+## 🚀 Fonctionnalités
 
-- API REST sécurisée (HTTPS + Token + username)
-- Redémarrage, arrêt, message global, kick, commandes à distance
-- Intégration mobile ou frontend
-- Journalisation des actions avec trace utilisateur
+- 🔐 Authentification par token + signature HMAC optionnelle
+- 🌐 API REST en JSON
+- 📱 Compatible avec application mobile externe
+- ✅ Endpoints sécurisés (commande, message, kick, etc.)
+- 🔒 HTTPS via keystore configurable
+- 🧪 Validation automatique des paramètres JSON
 
-## 🔧 Configuration
+## 📦 Endpoints
+
+| Méthode | URL                | Description                                 |
+|---------|--------------------|---------------------------------------------|
+| GET     | `/api/serverinfo`  | Joueurs connectés + slots max               |
+| GET     | `/api/status`      | Statut mémoire et nombre de joueurs         |
+| GET     | `/api/players`     | Liste des joueurs avec UUID et ping         |
+| GET     | `/api/chatlog`     | Historique du chat récent                   |
+| POST    | `/api/message`     | Envoie un message aux joueurs               |
+| POST    | `/api/broadcast`   | Message chat + console                      |
+| POST    | `/api/command`     | Exécute une commande console                |
+| POST    | `/api/kick`        | Expulse un joueur avec raison               |
+| POST    | `/api/stop`        | Arrêt du serveur                            |
+| POST    | `/api/restart`     | Redémarrage du serveur                      |
+| POST    | `/api/playerinfo`  | Détails d’un joueur (vie, position, etc.)   |
+
+## ⚙️ Configuration (`config.yml`)
 
 ```yaml
 api:
   enabled: true
   port: 8443
-  token: CHANGEMOI
+  token: votretokenici
   ssl: true
   keystore:
-    path: keystore.jks
-    password: CHANGEMOI
+    path: plugins/Keystone/keystore.jks
+    password: changeit
+  hmac:
+    enabled: true
+    secret: votreSecretIci
 ```
 
-## 🚀 Endpoints disponibles
+## 🔧 Générer un keystore
 
-| Méthode | Endpoint           | Description                      |
-|---------|--------------------|----------------------------------|
-| GET     | `/api/serverinfo`  | Infos joueurs                    |
-| GET     | `/api/status`      | RAM + slots                      |
-| POST    | `/api/stop`        | Arrêt                            |
-| POST    | `/api/restart`     | Redémarrage                      |
-| GET     | `/api/players`     | Liste joueurs connectés          |
-| POST    | `/api/message`     | Message global                   |
-| POST    | `/api/kick`        | Expulsion personnalisée          |
-| POST    | `/api/command`     | Exécute une commande             |
-| GET     | `/api/chatlog`     | Logs récents du chat             |
+```bash
+keytool -genkeypair -alias server -keyalg RSA -keysize 2048 -keystore keystore.jks -validity 365
+```
 
-## 🔐 Authentification
+## 🧠 HMAC Signature (optionnelle)
 
-- Header obligatoire : `Authorization: Bearer VOTRE_TOKEN`
-- Tous les endpoints POST exigent `username` (identité humaine pour trace)
+Chaque requête POST peut être signée côté client avec un HMAC SHA-256 utilisant :
 
-## 📦 Déploiement
+```
+Méthode + URI + Body + Secret
+```
 
-1. Place le plugin dans `/plugins`
-2. Configure ton SSL avec `keytool`
-3. Démarre ton serveur Spigot
+Header attendu :  
+`X-Signature: <signature hex>`
 
-## 👨‍💻 Auteurs
+## 📱 Application mobile
 
-Made by **Djinn** with love ❤️
+Une app Android compagnon permet de :
+
+- Voir les joueurs connectés
+- Envoyer des messages
+- Exécuter des commandes
+- Gérer les accès avec pseudo/password
+
+## 🖼️ Icône & Branding
+
+![Keystone Logo](./plugin-icon.png)
+
+## 📄 Licence
+
+MIT © Djinn - 2025

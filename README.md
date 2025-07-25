@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="plugin-icon.png" width="96" height="96" alt="Keystone logo"/>
+</p>
+
 # 🔐 Keystone - ServerManager API Plugin
 
 Keystone est un plugin Minecraft pour Spigot 1.21+ qui permet de contrôler votre serveur via une API HTTPS sécurisée (token + SSL + audit log).

@@ -6,3 +6,6 @@ api:
   keystore:
     path: "plugins/ServerManager/keystore.jks"
     password: "changeit"
+  hmac:
+    enabled: true
+    secret: CHANGEMOI

@@ -1,6 +1,9 @@
 package fr.djinn.servermanager;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import fi.iki.elonen.NanoHTTPD;
+import fr.djinn.servermanager.security.HmacVerifier;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -8,6 +11,7 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import java.io.File;
 import java.io.FileInputStream;
+import java.lang.reflect.Type;
 import java.security.KeyStore;
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +21,7 @@ public class ServerApiHttp extends NanoHTTPD {
 
     private final String authToken;
     private final ServerManager plugin;
+    private final Gson gson = new Gson();
 
     public ServerApiHttp(ServerManager plugin, int port, String authToken) {
         super(port);
@@ -49,10 +54,20 @@ public class ServerApiHttp extends NanoHTTPD {
             return newFixedLengthResponse(Response.Status.UNAUTHORIZED, "text/plain", "401 Unauthorized");
         }
 
+        String secret = plugin.getConfig().getString("api.hmac.secret");
+        boolean hmacEnabled = plugin.getConfig().getBoolean("api.hmac.enabled", false);
+
+        String body = getRequestBody(session);
+
+        if (hmacEnabled && session.getMethod() != Method.GET) {
+            if (!HmacVerifier.isValidSignature(session.getMethod().name(), session.getUri(), headers, body, secret)) {
+                return newFixedLengthResponse(Response.Status.UNAUTHORIZED, "text/plain", "HMAC signature invalide");
+            }
+        }
+
         String uri = session.getUri();
         Method method = session.getMethod();
 
-        // --- GET /api/serverinfo
         if (uri.equalsIgnoreCase("/api/serverinfo") && method == Method.GET) {
             int players = Bukkit.getOnlinePlayers().size();
             int max = Bukkit.getMaxPlayers();
@@ -60,7 +75,6 @@ public class ServerApiHttp extends NanoHTTPD {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json);
         }
 
-        // --- GET /api/status
         if (uri.equalsIgnoreCase("/api/status") && method == Method.GET) {
             Runtime rt = Runtime.getRuntime();
             long usedMem = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
@@ -72,7 +86,6 @@ public class ServerApiHttp extends NanoHTTPD {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json);
         }
 
-        // --- GET /api/players
         if (uri.equalsIgnoreCase("/api/players") && method == Method.GET) {
             StringBuilder json = new StringBuilder("[");
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -84,28 +97,25 @@ public class ServerApiHttp extends NanoHTTPD {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json.toString());
         }
 
-        // --- POST /api/stop
         if (uri.equalsIgnoreCase("/api/stop") && method == Method.POST) {
-            return handlePostWithUsername(session, (username, params) -> {
+            return handleJson(session, body, (username, data) -> {
                 plugin.getLogger().warning("🛑 Arrêt demandé par " + username);
                 plugin.getServer().getScheduler().runTask(plugin, Bukkit::shutdown);
                 return "Arrêt du serveur lancé.";
             });
         }
 
-        // --- POST /api/restart
         if (uri.equalsIgnoreCase("/api/restart") && method == Method.POST) {
-            return handlePostWithUsername(session, (username, params) -> {
+            return handleJson(session, body, (username, data) -> {
                 plugin.getLogger().warning("♻️ Redémarrage demandé par " + username);
                 plugin.getServer().getScheduler().runTask(plugin, Bukkit::shutdown);
                 return "Redémarrage du serveur lancé.";
             });
         }
 
-        // --- POST /api/message
         if (uri.equalsIgnoreCase("/api/message") && method == Method.POST) {
-            return handlePostWithUsername(session, (username, params) -> {
-                String text = getFirstParam(params, "text");
+            return handleJson(session, body, (username, data) -> {
+                String text = data.get("text");
                 if (text == null || text.isEmpty()) return "Paramètre 'text' requis.";
                 Bukkit.broadcastMessage("§a[" + username + "] §f" + text);
                 plugin.getLogger().info("📢 Message envoyé par " + username + " : " + text);
@@ -113,12 +123,11 @@ public class ServerApiHttp extends NanoHTTPD {
             });
         }
 
-        // --- POST /api/kick
         if (uri.equalsIgnoreCase("/api/kick") && method == Method.POST) {
-            return handlePostWithUsername(session, (username, params) -> {
-                String target = getFirstParam(params, "player");
-                String reason = getFirstParam(params, "reason", "Expulsé via l'API");
-                String silent = getFirstParam(params, "silent", "false");
+            return handleJson(session, body, (username, data) -> {
+                String target = data.get("player");
+                String reason = data.getOrDefault("reason", "Expulsé via l'API");
+                String silent = data.getOrDefault("silent", "false");
 
                 if (target == null) return "Paramètre 'player' requis.";
                 Player player = Bukkit.getPlayerExact(target);
@@ -138,10 +147,9 @@ public class ServerApiHttp extends NanoHTTPD {
             });
         }
 
-        // --- POST /api/command
         if (uri.equalsIgnoreCase("/api/command") && method == Method.POST) {
-            return handlePostWithUsername(session, (username, params) -> {
-                String cmd = getFirstParam(params, "cmd");
+            return handleJson(session, body, (username, data) -> {
+                String cmd = data.get("cmd");
                 if (cmd == null || cmd.isEmpty()) return "Paramètre 'cmd' requis.";
                 plugin.getLogger().info("⚙️ [" + username + "] a exécuté : /" + cmd);
                 plugin.getServer().getScheduler().runTask(plugin, () ->
@@ -150,7 +158,6 @@ public class ServerApiHttp extends NanoHTTPD {
             });
         }
 
-        // --- GET /api/chatlog
         if (uri.equalsIgnoreCase("/api/chatlog") && method == Method.GET) {
             List<String> logs = ChatLogger.getLastMessages();
             StringBuilder json = new StringBuilder("[");
@@ -165,41 +172,33 @@ public class ServerApiHttp extends NanoHTTPD {
         return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "404 Not Found");
     }
 
-    private String getFirstParam(Map<String, List<String>> params, String key) {
-        return getFirstParam(params, key, null);
-    }
-
-    private String getFirstParam(Map<String, List<String>> params, String key, String defaultValue) {
-        List<String> values = params.get(key);
-        return (values != null && !values.isEmpty()) ? values.getFirst() : defaultValue;
-    }
-
-    private String requireUsername(Map<String, List<String>> parameters) {
-        String username = getFirstParam(parameters, "username");
-        if (username == null || username.trim().isEmpty()) {
-            throw new IllegalArgumentException("Paramètre 'username' requis.");
-        }
-        return username;
-    }
-
-    @FunctionalInterface
-    private interface PostHandler {
-        String handle(String username, Map<String, List<String>> parameters) throws Exception;
-    }
-
-    private Response handlePostWithUsername(IHTTPSession session, PostHandler handler) {
+    private String getRequestBody(IHTTPSession session) {
         try {
-            session.parseBody(new HashMap<>());
-            Map<String, List<String>> parameters = session.getParameters();
-            String username = requireUsername(parameters);
-            String result = handler.handle(username, parameters);
-            return newFixedLengthResponse(Response.Status.OK, "text/plain", result);
-        } catch (IllegalArgumentException e) {
-            return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", e.getMessage());
+            Map<String, String> files = new HashMap<>();
+            session.parseBody(files);
+            return files.get("postData") != null ? files.get("postData") : "";
         } catch (Exception e) {
-            e.printStackTrace();
+            return "";
+        }
+    }
+
+    private Response handleJson(IHTTPSession session, String body, JsonHandler handler) {
+        try {
+            Type mapType = new TypeToken<Map<String, String>>() {}.getType();
+            Map<String, String> data = gson.fromJson(body, mapType);
+            if (data == null || !data.containsKey("username")) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Paramètre 'username' requis.");
+            }
+            String username = data.get("username");
+            String result = handler.handle(username, data);
+            return newFixedLengthResponse(Response.Status.OK, "text/plain", result);
+        } catch (Exception e) {
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Erreur serveur : " + e.getMessage());
         }
     }
 
+    @FunctionalInterface
+    private interface JsonHandler {
+        String handle(String username, Map<String, String> data) throws Exception;
+    }
 }
